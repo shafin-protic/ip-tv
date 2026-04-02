@@ -3,44 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>IPTV Player - Google Sheets Database</title>
+    <title>IPTV Player</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #ffffff; height: 100vh; overflow: hidden; }
         .app { display: flex; flex-direction: column; height: 100vh; width: 100vw; background: #000000; }
-        .header { background: #000000; padding: 12px 20px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; flex-shrink: 0; }
-        .logo h1 { font-size: 1.1rem; font-weight: 500; color: #ffffff; }
-        .logo p { font-size: 0.65rem; color: #666; margin-top: 2px; }
-        .status-area { display: flex; align-items: center; gap: 12px; }
-        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: #888; }
-        .led { width: 8px; height: 8px; border-radius: 50%; background: #ff5e5e; }
+        
+        /* Compact Header */
+        .header { background: #000000; padding: 8px 16px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo h1 { font-size: 1rem; font-weight: 500; color: #ffffff; }
+        
+        /* Live Badge Animation */
+        .live-badge { display: flex; align-items: center; gap: 4px; background: #ff0000; padding: 2px 8px; border-radius: 4px; animation: pulse 1.5s infinite; }
+        .live-badge span { font-size: 0.65rem; font-weight: bold; color: #ffffff; letter-spacing: 0.5px; }
+        .live-dot { width: 6px; height: 6px; background: #ffffff; border-radius: 50%; animation: blink 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .compact-btn { background: #1a1a1a; border: 1px solid #2a2a2a; color: #ffffff; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 500; transition: all 0.2s; }
+        .compact-btn:hover { background: #2a2a2a; }
+        .credit { font-size: 0.55rem; color: #444; }
+        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.65rem; color: #888; }
+        .led { width: 6px; height: 6px; border-radius: 50%; background: #ff5e5e; }
         .led.active { background: #2eff8c; }
-        button { background: #1a1a1a; border: 1px solid #2a2a2a; color: #ffffff; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 500; transition: all 0.2s; }
-        button:hover { background: #2a2a2a; }
-        .mode-toggle { display: flex; gap: 6px; background: #0a0a0a; padding: 3px; border-radius: 8px; border: 1px solid #1a1a1a; }
-        .mode-btn { background: transparent; border: none; padding: 4px 12px; font-size: 0.7rem; border-radius: 6px; cursor: pointer; color: #888; }
+        
+        .mode-toggle { display: flex; gap: 4px; background: #0a0a0a; padding: 2px; border-radius: 6px; border: 1px solid #1a1a1a; }
+        .mode-btn { background: transparent; border: none; padding: 3px 10px; font-size: 0.65rem; border-radius: 4px; cursor: pointer; color: #888; }
         .mode-btn.active { background: #2a2a2a; color: #ffffff; }
+        
         .main-content { display: flex; flex: 1; overflow: hidden; min-height: 0; }
         .channel-sidebar { width: 360px; background: #000000; border-right: 1px solid #1a1a1a; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
-        .sidebar-header { padding: 12px 16px; border-bottom: 1px solid #1a1a1a; flex-shrink: 0; }
-        .channel-search { width: 100%; padding: 8px 12px; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 6px; color: #ffffff; font-size: 0.75rem; outline: none; margin-bottom: 10px; }
-        .category-filter { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; max-height: 80px; overflow-y: auto; }
-        .category-tag { background: #0a0a0a; border: 1px solid #1a1a1a; padding: 4px 10px; border-radius: 16px; font-size: 0.65rem; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-        .category-tag:hover, .category-tag.active { background: #2a2a2a; border-color: #3a3a3a; }
-        .sheet-info { font-size: 0.6rem; color: #444; margin-top: 10px; text-align: center; }
-        .channel-list-container { flex: 1; overflow-y: auto; padding: 8px; }
+        .sidebar-header { padding: 10px 12px; border-bottom: 1px solid #1a1a1a; flex-shrink: 0; }
+        .channel-search { width: 100%; padding: 6px 10px; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 6px; color: #ffffff; font-size: 0.7rem; outline: none; margin-bottom: 8px; }
+        
+        /* Category Dropdown */
+        .category-dropdown { width: 100%; padding: 6px 10px; background: #0a0a0a; border: 1px solid #1a1a1a; border-radius: 6px; color: #ffffff; font-size: 0.7rem; outline: none; cursor: pointer; }
+        
+        .channel-list-container { flex: 1; overflow-y: auto; padding: 6px; }
         .channel-list-container::-webkit-scrollbar { width: 4px; }
         .channel-list-container::-webkit-scrollbar-track { background: #0a0a0a; }
         .channel-list-container::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
-        .channel-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 2px 0; border-radius: 8px; background: transparent; cursor: pointer; transition: all 0.15s; }
+        .channel-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin: 2px 0; border-radius: 6px; background: transparent; cursor: pointer; transition: all 0.15s; }
         .channel-item:hover { background: #0f0f0f; }
         .channel-item.active { background: #0f0f0f; border-left: 2px solid #ffffff; }
-        .channel-icon { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #0a0a0a; flex-shrink: 0; }
-        .channel-icon.fallback { display: flex; align-items: center; justify-content: center; font-size: 1.3rem; background: #0a0a0a; }
+        .channel-icon { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; background: #0a0a0a; flex-shrink: 0; }
+        .channel-icon.fallback { display: flex; align-items: center; justify-content: center; font-size: 1rem; background: #0a0a0a; }
         .channel-info { flex: 1; min-width: 0; }
-        .channel-name { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e0e0e0; }
-        .channel-category { font-size: 0.6rem; color: #666; margin-top: 2px; }
+        .channel-name { font-size: 0.75rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e0e0e0; }
+        .channel-category { font-size: 0.55rem; color: #666; margin-top: 2px; }
         .player-area { flex: 1; display: flex; flex-direction: column; background: #000000; min-width: 0; overflow: hidden; }
         .video-container { flex: 1; background: #000000; position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden; }
         .video-container.radio-mode { display: none; }
@@ -60,40 +73,42 @@
         .equalizer-bar:nth-child(5) { animation-delay: 0.8s; height: 20px; }
         .equalizer-bar:nth-child(6) { animation-delay: 1s; height: 12px; }
         @keyframes equalize { 0%, 100% { height: 10px; } 50% { height: 30px; } }
-        .controls { background: #000000; padding: 12px 20px; display: flex; align-items: center; justify-content: center; gap: 20px; border-top: 1px solid #1a1a1a; flex-shrink: 0; }
-        .control-btn { width: 36px; height: 36px; border-radius: 50%; font-size: 1rem; background: #0f0f0f; border: 1px solid #1a1a1a; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+        .controls { background: #000000; padding: 8px 16px; display: flex; align-items: center; justify-content: center; gap: 16px; border-top: 1px solid #1a1a1a; flex-shrink: 0; }
+        .control-btn { width: 32px; height: 32px; border-radius: 50%; font-size: 0.9rem; background: #0f0f0f; border: 1px solid #1a1a1a; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
         .control-btn:hover { background: #1a1a1a; }
-        .volume-control { display: flex; align-items: center; gap: 8px; background: #0f0f0f; padding: 4px 12px; border-radius: 20px; border: 1px solid #1a1a1a; }
-        .volume-control span { font-size: 0.75rem; color: #888; }
-        input[type="range"] { width: 80px; height: 3px; -webkit-appearance: none; background: #2a2a2a; border-radius: 3px; outline: none; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #ffffff; cursor: pointer; }
-        .loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 10px 20px; border-radius: 8px; font-size: 0.75rem; z-index: 20; color: #888; border: 1px solid #1a1a1a; }
-        .toast { position: fixed; bottom: 80px; right: 20px; background: #1a1a1a; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 0.7rem; z-index: 200; animation: fadeIn 0.2s ease; border: 1px solid #2a2a2a; }
+        .volume-control { display: flex; align-items: center; gap: 6px; background: #0f0f0f; padding: 3px 10px; border-radius: 20px; border: 1px solid #1a1a1a; }
+        .volume-control span { font-size: 0.7rem; color: #888; }
+        input[type="range"] { width: 70px; height: 3px; -webkit-appearance: none; background: #2a2a2a; border-radius: 3px; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 8px; height: 8px; border-radius: 50%; background: #ffffff; cursor: pointer; }
+        .loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 8px 16px; border-radius: 6px; font-size: 0.7rem; z-index: 20; color: #888; border: 1px solid #1a1a1a; }
+        .toast { position: fixed; bottom: 80px; right: 20px; background: #1a1a1a; color: #ffffff; padding: 5px 12px; border-radius: 6px; font-size: 0.65rem; z-index: 200; animation: fadeIn 0.2s ease; border: 1px solid #2a2a2a; }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
-        @media (max-width: 768px) { .channel-sidebar { width: 300px; } .channel-icon { width: 35px; height: 35px; } }
+        @media (max-width: 768px) { .channel-sidebar { width: 280px; } .channel-icon { width: 28px; height: 28px; } .credit { display: none; } }
     </style>
 </head>
 <body>
 <div class="app">
     <div class="header">
-        <div class="logo"><h1>IPTV Player</h1><p>Google Sheets Database</p></div>
-        <div class="status-area">
+        <div class="logo">
+            <h1>IPTV Player</h1>
+            <div class="live-badge"><div class="live-dot"></div><span>LIVE</span></div>
+        </div>
+        <div class="header-right">
             <div class="mode-toggle">
-                <button class="mode-btn active" id="tvModeBtn">📺 TV</button>
-                <button class="mode-btn" id="radioModeBtn">🎵 Radio</button>
+                <button class="mode-btn active" id="tvModeBtn">TV</button>
+                <button class="mode-btn" id="radioModeBtn">Radio</button>
             </div>
             <div class="status-badge"><span class="led" id="statusLed"></span><span id="statusText">Ready</span></div>
+            <button class="compact-btn" id="loadSheetBtn">Load</button>
         </div>
     </div>
     <div class="main-content">
         <div class="channel-sidebar">
             <div class="sidebar-header">
-                <input type="text" class="channel-search" id="searchInput" placeholder="Search channels...">
-                <div class="category-filter" id="categoryFilter"></div>
-                <button id="loadSheetBtn" style="width: 100%; margin-top: 10px;">📥 Load Channels from Sheet</button>
-                <div class="sheet-info">✅ Using formatted Google Sheet</div>
+                <input type="text" class="channel-search" id="searchInput" placeholder="Search...">
+                <select class="category-dropdown" id="categoryDropdown"></select>
             </div>
-            <div class="channel-list-container" id="channelList"><div style="text-align:center; padding:40px 20px; font-size:0.7rem; color:#444;">Click "Load Channels" to start</div></div>
+            <div class="channel-list-container" id="channelList"><div style="text-align:center; padding:40px 20px; font-size:0.7rem; color:#444;">Click Load to start</div></div>
         </div>
         <div class="player-area">
             <div class="video-container" id="videoContainer"><video id="videoPlayer" controls style="width:100%; height:100%;"></video><div id="loadingOverlay" class="loading" style="display:none;">Loading...</div></div>
@@ -101,24 +116,19 @@
             <div class="controls"><button class="control-btn" id="playBtn">▶</button><button class="control-btn" id="pauseBtn">⏸</button><button class="control-btn" id="stopBtn">⏹</button><div class="volume-control"><span>🔊</span><input type="range" id="volumeSlider" min="0" max="100" value="70"></div></div>
         </div>
     </div>
+    <div class="credit" style="text-align: center; padding: 4px; font-size: 0.55rem; color: #333; border-top: 1px solid #0a0a0a;">&lt;/&gt; Credit: Shafin Al Asad Protic ❤</div>
 </div>
 
 <script>
-    // YOUR GOOGLE SHEET CSV URL
     const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTESN5TIXBEckCTwsoNEyMtecwRRkQoQwMI-09RPuz7kjwz-jPROLsNdfmRY0Q0aYFfeLgIQrFXbRZK/pub?gid=1947259241&single=true&output=csv";
     
-    let channels = [];
-    let filteredChannels = [];
-    let currentChannel = null;
-    let videoPlayer = null;
-    let hls = null;
-    let currentMode = 'tv';
+    let channels = [], filteredChannels = [], currentChannel = null, videoPlayer = null, hls = null, currentMode = 'tv';
     let activeCategory = 'All';
     let categories = new Set();
     
     const channelListDiv = document.getElementById('channelList');
     const searchInput = document.getElementById('searchInput');
-    const categoryFilterDiv = document.getElementById('categoryFilter');
+    const categoryDropdown = document.getElementById('categoryDropdown');
     const statusLed = document.getElementById('statusLed');
     const statusText = document.getElementById('statusText');
     const loadSheetBtn = document.getElementById('loadSheetBtn');
@@ -174,16 +184,13 @@
     }
     
     async function loadFromGoogleSheet() {
-        setStatus('Fetching from Google Sheet...');
-        showToast('Loading channels from Google Sheet...', false);
+        setStatus('Fetching...');
+        showToast('Loading channels...', false);
         
         try {
             const response = await fetch(GOOGLE_SHEET_CSV_URL);
-            
             if (response.ok) {
                 const csvText = await response.text();
-                console.log("CSV Content:", csvText.substring(0, 500));
-                
                 const rows = csvText.split(/\r?\n/);
                 const parsedChannels = [];
                 categories.clear();
@@ -193,42 +200,24 @@
                     const row = rows[i].trim();
                     if (!row) continue;
                     
-                    // Parse CSV properly
                     const fields = [];
                     let currentField = '';
                     let inQuotes = false;
-                    
                     for (let char of row) {
-                        if (char === '"') {
-                            inQuotes = !inQuotes;
-                        } else if (char === ',' && !inQuotes) {
-                            fields.push(currentField.trim());
-                            currentField = '';
-                        } else {
-                            currentField += char;
-                        }
+                        if (char === '"') inQuotes = !inQuotes;
+                        else if (char === ',' && !inQuotes) { fields.push(currentField.trim()); currentField = ''; }
+                        else currentField += char;
                     }
                     fields.push(currentField.trim());
                     
-                    const cleanField = (field) => {
-                        if (!field) return '';
-                        return field.replace(/^["']|["']$/g, '');
-                    };
-                    
-                    const sl = cleanField(fields[0]);
+                    const cleanField = (field) => field ? field.replace(/^["']|["']$/g, '') : '';
                     const name = cleanField(fields[1]);
                     const url = cleanField(fields[2]);
                     const category = cleanField(fields[3]) || 'Uncategorized';
                     const logoUrl = cleanField(fields[4]);
                     
                     if (name && url && url.startsWith('http')) {
-                        parsedChannels.push({
-                            id: sl || i,
-                            name: name,
-                            url: url,
-                            category: category,
-                            logo: logoUrl
-                        });
+                        parsedChannels.push({ name, url, category, logo: logoUrl });
                         categories.add(category);
                     }
                 }
@@ -236,61 +225,48 @@
                 if (parsedChannels.length > 0) {
                     channels = parsedChannels;
                     filteredChannels = [...channels];
-                    renderCategoryFilter();
+                    populateCategoryDropdown();
                     renderChannelList();
-                    setStatus(`✅ ${channels.length} channels loaded`);
-                    showToast(`Loaded ${channels.length} channels from Google Sheet!`, false);
+                    setStatus(`✅ ${channels.length} ch`);
+                    showToast(`Loaded ${channels.length} channels!`, false);
                     if (channels.length > 0 && !currentChannel) selectChannel(channels[0]);
-                } else {
-                    throw new Error('No valid channels found in sheet');
-                }
-            } else {
-                throw new Error(`HTTP ${response.status}`);
-            }
+                } else throw new Error('No valid channels found');
+            } else throw new Error(`HTTP ${response.status}`);
         } catch (error) {
-            console.error('Sheet fetch error:', error);
-            setStatus('Failed to load', true);
-            showToast(`Error: ${error.message}. Make sure the sheet is published correctly.`, true);
-            channelListDiv.innerHTML = '<div style="text-align:center; padding:40px 20px; font-size:0.7rem; color:#444;">Failed to load<br>Check that the sheet is published as CSV</div>';
+            setStatus('Failed', true);
+            showToast(`Error: ${error.message}`, true);
         }
     }
     
-    function renderCategoryFilter() {
+    function populateCategoryDropdown() {
         const sortedCategories = Array.from(categories).sort();
-        let html = `<div class="category-tag ${activeCategory === 'All' ? 'active' : ''}" data-category="All">All (${channels.length})</div>`;
-        
+        let html = `<option value="All">All Categories (${channels.length})</option>`;
         for (let cat of sortedCategories) {
             if (cat === 'All') continue;
             const count = channels.filter(ch => ch.category === cat).length;
-            html += `<div class="category-tag ${activeCategory === cat ? 'active' : ''}" data-category="${escapeHtml(cat)}">${escapeHtml(cat)} (${count})</div>`;
+            html += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)} (${count})</option>`;
         }
-        
-        categoryFilterDiv.innerHTML = html;
-        
-        document.querySelectorAll('.category-tag').forEach(tag => {
-            tag.addEventListener('click', () => {
-                activeCategory = tag.dataset.category;
-                renderCategoryFilter();
-                applyFilters();
-            });
+        categoryDropdown.innerHTML = html;
+        categoryDropdown.value = activeCategory;
+        categoryDropdown.addEventListener('change', () => {
+            activeCategory = categoryDropdown.value;
+            applyFilters();
         });
     }
     
     function applyFilters() {
         const searchTerm = searchInput.value.toLowerCase();
-        
         filteredChannels = channels.filter(ch => {
             if (activeCategory !== 'All' && ch.category !== activeCategory) return false;
             if (searchTerm && !ch.name.toLowerCase().includes(searchTerm)) return false;
             return true;
         });
-        
         renderChannelList();
     }
     
     function renderChannelList() {
         if (filteredChannels.length === 0) {
-            channelListDiv.innerHTML = '<div style="text-align:center; padding:40px 20px; font-size:0.7rem; color:#444;">No channels found</div>';
+            channelListDiv.innerHTML = '<div style="text-align:center; padding:40px 20px; font-size:0.7rem; color:#444;">No channels</div>';
             return;
         }
         
@@ -298,41 +274,18 @@
         filteredChannels.forEach((ch, idx) => {
             const isActive = currentChannel && currentChannel.url === ch.url;
             const isRadio = ch.category === 'Radio' || ch.name.toLowerCase().includes('radio');
-            
-            let iconHtml = '';
-            if (ch.logo && ch.logo.startsWith('http')) {
-                iconHtml = `<img class="channel-icon" src="${escapeHtml(ch.logo)}" alt="" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'channel-icon fallback\'>${isRadio ? '🎵' : '📺'}</div>'">`;
-            } else {
-                iconHtml = `<div class="channel-icon fallback">${isRadio ? '🎵' : '📺'}</div>`;
-            }
-            
-            html += `
-                <div class="channel-item ${isActive ? 'active' : ''}" data-index="${idx}">
-                    ${iconHtml}
-                    <div class="channel-info">
-                        <div class="channel-name" title="${escapeHtml(ch.name)}">${escapeHtml(ch.name)}</div>
-                        <div class="channel-category">${escapeHtml(ch.category)}</div>
-                    </div>
-                </div>
-            `;
+            let iconHtml = ch.logo && ch.logo.startsWith('http') ? 
+                `<img class="channel-icon" src="${escapeHtml(ch.logo)}" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'channel-icon fallback\'>${isRadio ? '🎵' : '📺'}</div>'">` : 
+                `<div class="channel-icon fallback">${isRadio ? '🎵' : '📺'}</div>`;
+            html += `<div class="channel-item ${isActive ? 'active' : ''}" data-index="${idx}">${iconHtml}<div class="channel-info"><div class="channel-name">${escapeHtml(ch.name)}</div><div class="channel-category">${escapeHtml(ch.category)}</div></div></div>`;
         });
-        
         channelListDiv.innerHTML = html;
-        
         document.querySelectorAll('.channel-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const idx = parseInt(item.dataset.index);
-                if (filteredChannels[idx]) {
-                    selectChannel(filteredChannels[idx]);
-                }
-            });
+            item.addEventListener('click', () => { const idx = parseInt(item.dataset.index); if (filteredChannels[idx]) selectChannel(filteredChannels[idx]); });
         });
     }
     
-    function escapeHtml(str) { 
-        if (!str) return ''; 
-        return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); 
-    }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
     
     function selectChannel(channel) {
         if (!channel || !channel.url) return;
@@ -369,18 +322,15 @@
     tvModeBtn.addEventListener('click', () => switchMode('tv'));
     radioModeBtn.addEventListener('click', () => switchMode('radio'));
     loadSheetBtn.addEventListener('click', loadFromGoogleSheet);
-    
-    playBtn.addEventListener('click', () => { if (videoPlayer && videoPlayer.src) videoPlayer.play().catch(() => {}); else if (currentChannel) playStream(currentChannel.url, currentChannel.name); else if (channels.length > 0) selectChannel(channels[0]); else showToast('Load channels first', true); });
+    playBtn.addEventListener('click', () => { if (videoPlayer && videoPlayer.src) videoPlayer.play().catch(() => {}); else if (currentChannel) playStream(currentChannel.url, currentChannel.name); else if (channels.length > 0) selectChannel(channels[0]); else showToast('Load first', true); });
     pauseBtn.addEventListener('click', () => { if (videoPlayer) videoPlayer.pause(); });
     stopBtn.addEventListener('click', () => { destroyHls(); if (videoPlayer) { videoPlayer.pause(); videoPlayer.removeAttribute('src'); videoPlayer.load(); } });
     volumeSlider.addEventListener('input', () => { if (videoPlayer) videoPlayer.volume = volumeSlider.value / 100; });
     searchInput.addEventListener('input', () => applyFilters());
     
     initVideo();
-    setStatus('Ready - Click Load Channels');
-    
-    setTimeout(() => { loadFromGoogleSheet(); }, 500);
-    
+    setStatus('Ready');
+    setTimeout(() => loadFromGoogleSheet(), 500);
     document.addEventListener('keydown', (e) => { if (e.code === 'Space' && document.activeElement !== searchInput) { e.preventDefault(); if (videoPlayer.paused) videoPlayer.play().catch(() => {}); else videoPlayer.pause(); } });
 </script>
 </body>
