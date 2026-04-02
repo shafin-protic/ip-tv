@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>IPTV Player</title>
+    <title>IPTV Player - TV & Radio Mode</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         * {
@@ -24,6 +24,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            width: 100vw;
             background: #000000;
         }
 
@@ -36,13 +37,13 @@
             justify-content: space-between;
             flex-wrap: wrap;
             gap: 12px;
+            flex-shrink: 0;
         }
 
         .logo h1 {
             font-size: 1.1rem;
             font-weight: 500;
             color: #ffffff;
-            letter-spacing: -0.3px;
         }
 
         .logo p {
@@ -90,14 +91,36 @@
 
         button:hover {
             background: #2a2a2a;
-            border-color: #3a3a3a;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 6px;
+            background: #0a0a0a;
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid #1a1a1a;
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            padding: 4px 12px;
+            font-size: 0.7rem;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .mode-btn.active {
+            background: #2a2a2a;
+            color: #ffffff;
         }
 
         .main-content {
             display: flex;
             flex: 1;
             overflow: hidden;
-            gap: 0;
+            min-height: 0;
         }
 
         .channel-sidebar {
@@ -107,11 +130,13 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            flex-shrink: 0;
         }
 
         .sidebar-header {
             padding: 12px 16px;
             border-bottom: 1px solid #1a1a1a;
+            flex-shrink: 0;
         }
 
         .channel-search {
@@ -127,10 +152,6 @@
 
         .channel-search:focus {
             border-color: #3a3a3a;
-        }
-
-        .channel-search::placeholder {
-            color: #444;
         }
 
         .channel-list-container {
@@ -181,12 +202,17 @@
             color: #e0e0e0;
         }
 
-        .channel-group {
-            font-size: 0.6rem;
-            color: #666;
-            background: #0a0a0a;
+        .channel-badge {
+            font-size: 0.55rem;
             padding: 2px 6px;
             border-radius: 4px;
+            background: #1a1a1a;
+            color: #888;
+        }
+
+        .channel-badge.radio {
+            background: #2a2a2a;
+            color: #7aa9ff;
         }
 
         .player-area {
@@ -194,7 +220,8 @@
             display: flex;
             flex-direction: column;
             background: #000000;
-            position: relative;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .video-container {
@@ -204,6 +231,16 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            min-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .video-container.radio-mode {
+            flex: 0;
+            height: 0;
+            min-height: 0;
+            display: none;
         }
 
         video {
@@ -211,6 +248,74 @@
             height: 100%;
             object-fit: contain;
             background: #000000;
+        }
+
+        /* Radio Mode Visualizer */
+        .radio-visualizer {
+            flex: 1;
+            background: linear-gradient(135deg, #0a0a0a 0%, #000000 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            display: none;
+        }
+
+        .radio-visualizer.active {
+            display: flex;
+        }
+
+        .radio-icon {
+            font-size: 4rem;
+            filter: drop-shadow(0 0 20px rgba(122, 169, 255, 0.3));
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+
+        .radio-station-name {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #ffffff;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        .radio-group {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .equalizer {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            justify-content: center;
+            height: 40px;
+        }
+
+        .equalizer-bar {
+            width: 4px;
+            height: 20px;
+            background: #7aa9ff;
+            border-radius: 2px;
+            animation: equalize 1s infinite ease-in-out;
+        }
+
+        .equalizer-bar:nth-child(1) { animation-delay: 0s; height: 15px; }
+        .equalizer-bar:nth-child(2) { animation-delay: 0.2s; height: 25px; }
+        .equalizer-bar:nth-child(3) { animation-delay: 0.4s; height: 10px; }
+        .equalizer-bar:nth-child(4) { animation-delay: 0.6s; height: 30px; }
+        .equalizer-bar:nth-child(5) { animation-delay: 0.8s; height: 20px; }
+        .equalizer-bar:nth-child(6) { animation-delay: 1s; height: 12px; }
+
+        @keyframes equalize {
+            0%, 100% { height: 10px; }
+            50% { height: 30px; }
         }
 
         .controls {
@@ -221,6 +326,7 @@
             justify-content: center;
             gap: 20px;
             border-top: 1px solid #1a1a1a;
+            flex-shrink: 0;
         }
 
         .control-btn {
@@ -239,7 +345,6 @@
 
         .control-btn:hover {
             background: #1a1a1a;
-            transform: scale(0.98);
         }
 
         .volume-control {
@@ -308,16 +413,12 @@
             to { opacity: 1; transform: translateX(0); }
         }
 
-        .success-toast {
-            background: #0f0f0f;
-            border-color: #2a2a2a;
-        }
-
         @media (max-width: 768px) {
             .channel-sidebar { width: 240px; }
             .control-btn { width: 32px; height: 32px; font-size: 0.9rem; }
             .controls { gap: 12px; padding: 10px 16px; }
             .channel-name { max-width: 140px; }
+            .radio-station-name { font-size: 1rem; }
         }
     </style>
 </head>
@@ -326,9 +427,13 @@
     <div class="header">
         <div class="logo">
             <h1>IPTV</h1>
-            <p>M3U Player</p>
+            <p>TV + Radio</p>
         </div>
         <div class="status-area">
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="tvModeBtn">📺 TV</button>
+                <button class="mode-btn" id="radioModeBtn">🎵 Radio</button>
+            </div>
             <div class="status-badge">
                 <span class="led" id="statusLed"></span>
                 <span id="statusText">Ready</span>
@@ -348,10 +453,25 @@
         </div>
 
         <div class="player-area">
-            <div class="video-container">
+            <div class="video-container" id="videoContainer">
                 <video id="videoPlayer" controls style="width:100%; height:100%;"></video>
                 <div id="loadingOverlay" class="loading" style="display:none;">Loading...</div>
             </div>
+            
+            <div class="radio-visualizer" id="radioVisualizer">
+                <div class="radio-icon">🎵</div>
+                <div class="equalizer">
+                    <div class="equalizer-bar"></div>
+                    <div class="equalizer-bar"></div>
+                    <div class="equalizer-bar"></div>
+                    <div class="equalizer-bar"></div>
+                    <div class="equalizer-bar"></div>
+                    <div class="equalizer-bar"></div>
+                </div>
+                <div class="radio-station-name" id="radioStationName">Select a station</div>
+                <div class="radio-group" id="radioGroupName"></div>
+            </div>
+            
             <div class="controls">
                 <button class="control-btn" id="playBtn">▶</button>
                 <button class="control-btn" id="pauseBtn">⏸</button>
@@ -373,6 +493,10 @@
     let currentChannel = null;
     let videoPlayer = null;
     let hls = null;
+    let currentMode = 'tv'; // 'tv' or 'radio'
+    let cachedChannels = null;
+    let lastFetchTime = 0;
+    const CACHE_DURATION = 5 * 60 * 1000;
     
     // DOM elements
     const channelListDiv = document.getElementById('channelList');
@@ -380,6 +504,12 @@
     const statusLed = document.getElementById('statusLed');
     const statusText = document.getElementById('statusText');
     const loadM3UBtn = document.getElementById('loadM3UBtn');
+    const tvModeBtn = document.getElementById('tvModeBtn');
+    const radioModeBtn = document.getElementById('radioModeBtn');
+    const videoContainer = document.getElementById('videoContainer');
+    const radioVisualizer = document.getElementById('radioVisualizer');
+    const radioStationName = document.getElementById('radioStationName');
+    const radioGroupName = document.getElementById('radioGroupName');
     const playBtn = document.getElementById('playBtn');
     const pauseBtn = document.getElementById('pauseBtn');
     const stopBtn = document.getElementById('stopBtn');
@@ -409,6 +539,37 @@
             hls.destroy();
             hls = null;
         }
+    }
+    
+    function switchMode(mode) {
+        currentMode = mode;
+        
+        if (mode === 'tv') {
+            videoContainer.classList.remove('radio-mode');
+            radioVisualizer.classList.remove('active');
+            tvModeBtn.classList.add('active');
+            radioModeBtn.classList.remove('active');
+            
+            // If there's a current channel, restart playback in TV mode
+            if (currentChannel) {
+                playStream(currentChannel.url, currentChannel.name);
+            }
+        } else {
+            videoContainer.classList.add('radio-mode');
+            radioVisualizer.classList.add('active');
+            radioModeBtn.classList.add('active');
+            tvModeBtn.classList.remove('active');
+            
+            // If there's a current channel, restart playback in Radio mode
+            if (currentChannel) {
+                playStream(currentChannel.url, currentChannel.name);
+            }
+        }
+    }
+    
+    function updateRadioDisplay(channel) {
+        radioStationName.textContent = channel.name;
+        radioGroupName.textContent = channel.group;
     }
     
     function parseM3U(content) {
@@ -441,88 +602,80 @@
         return parsed.filter(ch => ch.url && ch.url.length > 10);
     }
     
-    async function fetchM3U() {
-        // Comprehensive list of working proxies
+    async function fetchM3UParallel() {
+        if (cachedChannels && (Date.now() - lastFetchTime) < CACHE_DURATION) {
+            channels = cachedChannels;
+            filteredChannels = [...channels];
+            renderChannelList();
+            setStatus(`${channels.length} channels (cached)`);
+            showToast(`Loaded ${channels.length} channels`, false);
+            if (channels.length > 0 && !currentChannel) {
+                selectChannel(channels[0]);
+            }
+            return true;
+        }
+        
         const proxies = [
-            'https://api.allorigins.win/raw?url=',
-            'https://corsproxy.io/?',
-            'https://cors-anywhere.herokuapp.com/',
-            'https://thingproxy.freeboard.io/fetch/',
-            'https://api.codetabs.com/v1/proxy?quest='
+            { url: 'https://api.allorigins.win/raw?url=', timeout: 5000 },
+            { url: 'https://corsproxy.io/?', timeout: 5000 },
+            { url: 'https://cors-anywhere.herokuapp.com/', timeout: 8000 },
+            { url: 'https://thingproxy.freeboard.io/fetch/', timeout: 8000 }
         ];
         
         setStatus('Fetching...');
-        showToast('Loading M3U...');
         
-        // Try each proxy
-        for (let i = 0; i < proxies.length; i++) {
-            try {
-                const proxyUrl = proxies[i] + encodeURIComponent(M3U_URL);
-                console.log(`Trying proxy ${i+1}: ${proxies[i]}`);
-                
-                const response = await fetch(proxyUrl, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'text/plain, application/vnd.apple.mpegurl, */*'
-                    }
-                });
-                
-                if (response.ok) {
-                    const text = await response.text();
-                    // Check if we got actual M3U content
-                    if (text && (text.includes('#EXTM3U') || text.includes('#EXTINF'))) {
-                        const parsed = parseM3U(text);
-                        if (parsed.length > 0) {
-                            channels = parsed;
-                            filteredChannels = [...channels];
-                            renderChannelList();
-                            setStatus(`${channels.length} channels`);
-                            showToast(`Loaded ${channels.length} channels`, false);
-                            
-                            // Auto-select first channel
-                            if (channels.length > 0 && !currentChannel) {
-                                selectChannel(channels[0]);
-                            }
-                            return;
-                        }
-                    }
-                }
-            } catch (e) {
-                console.log(`Proxy ${i+1} failed:`, e.message);
-            }
-        }
-        
-        // If all proxies fail, try direct fetch (might work in some environments)
-        try {
-            console.log('Trying direct fetch...');
-            const response = await fetch(M3U_URL, {
-                mode: 'cors',
-                cache: 'no-store'
-            });
-            if (response.ok) {
-                const text = await response.text();
+        const fetchPromises = proxies.map(proxy => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), proxy.timeout);
+            
+            return fetch(proxy.url + encodeURIComponent(M3U_URL), {
+                signal: controller.signal,
+                headers: { 'Accept': 'text/plain, */*' }
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (response.ok) return response.text();
+                throw new Error('Failed');
+            })
+            .then(text => {
                 if (text && (text.includes('#EXTM3U') || text.includes('#EXTINF'))) {
-                    const parsed = parseM3U(text);
-                    if (parsed.length > 0) {
-                        channels = parsed;
-                        filteredChannels = [...channels];
-                        renderChannelList();
-                        setStatus(`${channels.length} channels`);
-                        showToast(`Loaded ${channels.length} channels`, false);
-                        if (channels.length > 0 && !currentChannel) {
-                            selectChannel(channels[0]);
-                        }
-                        return;
+                    return text;
+                }
+                throw new Error('Invalid M3U');
+            })
+            .catch(() => null);
+        });
+        
+        try {
+            const results = await Promise.race([
+                Promise.any(fetchPromises),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
+            ]);
+            
+            if (results) {
+                const parsed = parseM3U(results);
+                if (parsed.length > 0) {
+                    channels = parsed;
+                    filteredChannels = [...channels];
+                    cachedChannels = channels;
+                    lastFetchTime = Date.now();
+                    renderChannelList();
+                    setStatus(`${channels.length} channels`);
+                    showToast(`Loaded ${channels.length} channels`, false);
+                    if (channels.length > 0 && !currentChannel) {
+                        selectChannel(channels[0]);
                     }
+                    return true;
                 }
             }
         } catch (e) {
-            console.log('Direct fetch failed:', e.message);
+            console.log('All proxies failed:', e);
         }
         
         setStatus('Failed', true);
-        showToast('Failed to load M3U. Please check your connection.', true);
+        showToast('Failed to load M3U', true);
         channelListDiv.innerHTML = '<div style="text-align:center; padding:40px 20px; font-size:0.7rem; color:#444;">Failed to load<br>Click Load M3U to retry</div>';
+        return false;
     }
     
     function renderChannelList() {
@@ -540,10 +693,11 @@
         let html = '';
         filteredChannels.forEach((ch, idx) => {
             const isActive = currentChannel && currentChannel.url === ch.url;
+            const isRadio = ch.group === 'FM-Radio' || ch.group.includes('Radio') || ch.name.toLowerCase().includes('radio');
             html += `
                 <div class="channel-item ${isActive ? 'active' : ''}" data-index="${idx}">
-                    <div class="channel-name" title="${escapeHtml(ch.name)}">${escapeHtml(ch.name)}</div>
-                    <div class="channel-group">${escapeHtml(ch.group.substring(0, 12))}</div>
+                    <div class="channel-name" title="${escapeHtml(ch.name)}">${isRadio ? '🎵' : '📺'} ${escapeHtml(ch.name)}</div>
+                    <div class="channel-badge ${isRadio ? 'radio' : ''}">${escapeHtml(ch.group.substring(0, 10))}</div>
                 </div>
             `;
         });
@@ -575,14 +729,24 @@
         
         currentChannel = channel;
         renderChannelList();
-        playStream(channel.url);
+        updateRadioDisplay(channel);
+        playStream(channel.url, channel.name);
     }
     
-    function playStream(url) {
+    function playStream(url, channelName) {
         showLoading(true);
         destroyHls();
         
         const video = document.getElementById('videoPlayer');
+        
+        if (currentMode === 'radio') {
+            // In radio mode, hide video but keep audio playing
+            video.style.display = 'none';
+            updateRadioDisplay(currentChannel);
+        } else {
+            video.style.display = 'block';
+        }
+        
         video.pause();
         video.removeAttribute('src');
         video.load();
@@ -594,10 +758,9 @@
                 enableWorker: true,
                 lowLatencyMode: true,
                 maxBufferLength: 30,
-                manifestLoadingTimeOut: 15000,
-                levelLoadingTimeOut: 15000,
-                fragLoadingTimeOut: 20000,
-                debug: false
+                manifestLoadingTimeOut: 10000,
+                levelLoadingTimeOut: 10000,
+                fragLoadingTimeOut: 15000,
             });
             
             hls.loadSource(url);
@@ -605,39 +768,23 @@
             
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 showLoading(false);
-                video.play().catch(() => {
-                    // Autoplay blocked - user will need to click play
-                });
+                video.play().catch(() => {});
             });
             
             hls.on(Hls.Events.ERROR, (event, data) => {
                 if (data.fatal) {
-                    switch(data.type) {
-                        case Hls.ErrorTypes.NETWORK_ERROR:
-                            showToast('Network error, retrying...', true);
-                            hls.startLoad();
-                            break;
-                        case Hls.ErrorTypes.MEDIA_ERROR:
-                            showToast('Media error', true);
-                            hls.recoverMediaError();
-                            break;
-                        default:
-                            showLoading(false);
-                            showToast('Stream unavailable', true);
-                            break;
-                    }
+                    showLoading(false);
+                    showToast('Stream unavailable', true);
                 }
             });
             
         } else if (isHLS && video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Safari native HLS
             video.src = url;
             video.addEventListener('loadedmetadata', () => {
                 showLoading(false);
                 video.play().catch(() => {});
             });
         } else {
-            // Regular stream
             video.src = url;
             video.addEventListener('canplay', () => {
                 showLoading(false);
@@ -649,7 +796,6 @@
             };
         }
         
-        // Timeout for loading
         setTimeout(() => {
             if (loadingOverlay.style.display !== 'none') {
                 showLoading(false);
@@ -663,17 +809,15 @@
     }
     
     // Event listeners
-    loadM3UBtn.addEventListener('click', () => {
-        fetchM3U();
-    });
+    tvModeBtn.addEventListener('click', () => switchMode('tv'));
+    radioModeBtn.addEventListener('click', () => switchMode('radio'));
+    loadM3UBtn.addEventListener('click', () => fetchM3UParallel());
     
     playBtn.addEventListener('click', () => {
         if (videoPlayer && videoPlayer.src) {
-            videoPlayer.play().catch(() => {
-                showToast('Click the video to play', false);
-            });
+            videoPlayer.play().catch(() => {});
         } else if (currentChannel) {
-            playStream(currentChannel.url);
+            playStream(currentChannel.url, currentChannel.name);
         } else if (channels.length > 0) {
             selectChannel(channels[0]);
         } else {
@@ -708,8 +852,8 @@
     
     // Auto-load on start
     setTimeout(() => {
-        fetchM3U();
-    }, 500);
+        fetchM3UParallel();
+    }, 100);
     
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
