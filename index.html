@@ -59,6 +59,7 @@
         .status-icon { font-size: 0.7rem; margin-left: 5px; }
         .status-online { color: #2eff8c; }
         .status-offline { color: #ff5e5e; }
+        .status-checking { color: #ff9800; }
         
         .player-area { flex: 1; display: flex; flex-direction: column; background: #000000; min-width: 0; overflow: hidden; }
         .video-container { flex: 1; background: #000000; position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden; }
@@ -126,6 +127,7 @@
             <div class="status-bar" id="statusBar">
                 <div class="status-stat">🟢 <span id="onlineCount">0</span></div>
                 <div class="status-stat">🔴 <span id="offlineCount">0</span></div>
+                <div class="status-stat">🟠 <span id="checkingCount">0</span></div>
             </div>
             <div class="mode-toggle">
                 <button class="mode-btn active" id="tvModeBtn">📺 TV</button>
@@ -167,6 +169,7 @@
     let categories = new Set();
     let testingActive = false;
     let offlineChannels = new Set();
+    let checkingChannels = new Set();
     
     // DOM elements
     const channelListDiv = document.getElementById('channelList');
@@ -177,6 +180,7 @@
     const editSheetBtn = document.getElementById('editSheetBtn');
     const onlineCountSpan = document.getElementById('onlineCount');
     const offlineCountSpan = document.getElementById('offlineCount');
+    const checkingCountSpan = document.getElementById('checkingCount');
     const tvModeBtn = document.getElementById('tvModeBtn');
     const radioModeBtn = document.getElementById('radioModeBtn');
     const videoContainer = document.getElementById('videoContainer');
@@ -197,19 +201,16 @@
         setTimeout(() => toast.remove(), 2500);
     }
     
-    function setStatus(message, isError = false) {
-        // Status display removed from header, keeping only for internal use
-        console.log(`Status: ${message}`);
-    }
-    
     function showLoading(show) { loadingOverlay.style.display = show ? 'block' : 'none'; }
     function destroyHls() { if (hls) { hls.destroy(); hls = null; } }
     
     function updateStatusBar() {
-        const online = channels.filter(ch => !offlineChannels.has(ch.url)).length;
+        const online = channels.filter(ch => !offlineChannels.has(ch.url) && !checkingChannels.has(ch.url)).length;
         const offline = offlineChannels.size;
+        const checking = checkingChannels.size;
         onlineCountSpan.textContent = online;
         offlineCountSpan.textContent = offline;
+        checkingCountSpan.textContent = checking;
     }
     
     function switchMode(mode) {
@@ -234,13 +235,46 @@
         radioCategory.textContent = channel.category;
     }
     
-    async function testChannel(url) {
+    // Improved stream testing - actually tries to load a small piece of the stream
+    async function testStreamReal(url) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
         try {
-            await fetch(url, { method: 'HEAD', signal: controller.signal, mode: 'no-cors' });
+            // For HLS streams, try to fetch the master playlist
+            if (url.includes('.m3u8')) {
+                const response = await fetch(url, { 
+                    signal: controller.signal,
+                    headers: { 'Accept': 'application/vnd.apple.mpegurl, */*' }
+                });
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    const text = await response.text();
+                    // Check if it's a valid m3u8 (contains #EXTM3U or #EXTINF)
+                    if (text.includes('#EXTM3U') || text.includes('#EXTINF')) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            // For other streams, try to get first few bytes
+            const response = await fetch(url, { 
+                signal: controller.signal,
+                headers: { 'Range': 'bytes=0-1024' }
+            });
             clearTimeout(timeoutId);
-            return true;
+            
+            // Check if response is ok and has content
+            if (response.ok && response.status !== 404) {
+                const contentLength = response.headers.get('content-length');
+                if (contentLength && parseInt(contentLength) > 0) {
+                    return true;
+                }
+                return true; // Assume online if response ok
+            }
+            return false;
         } catch (error) {
             clearTimeout(timeoutId);
             return false;
@@ -255,12 +289,15 @@
         let tested = 0;
         let onlineCount = 0;
         
+        // Add all to checking set initially
+        channelArray.forEach(ch => checkingChannels.add(ch.url));
+        updateStatusBar();
         testingStatusDiv.innerHTML = `🔍 Testing 0/${total}`;
         
-        const batchSize = 5;
+        const batchSize = 3; // Smaller batch for more accurate testing
         for (let i = 0; i < channelArray.length; i += batchSize) {
             const batch = channelArray.slice(i, i + batchSize);
-            const results = await Promise.all(batch.map(ch => testChannel(ch.url)));
+            const results = await Promise.all(batch.map(ch => testStreamReal(ch.url)));
             
             for (let j = 0; j < batch.length; j++) {
                 const isOnline = results[j];
@@ -269,6 +306,7 @@
                 } else {
                     offlineChannels.add(batch[j].url);
                 }
+                checkingChannels.delete(batch[j].url);
                 tested++;
             }
             
@@ -277,6 +315,9 @@
             updateStatusBar();
             populateCategoryDropdown();
             applyFilters();
+            
+            // Small delay between batches
+            await new Promise(r => setTimeout(r, 100));
         }
         
         testingStatusDiv.innerHTML = `✅ Complete: ${onlineCount} online, ${total - onlineCount} offline`;
@@ -291,7 +332,7 @@
         }, 3000);
         
         testingActive = false;
-        showToast(`Found ${onlineCount} active channels`, false);
+        showToast(`Found ${onlineCount} active channels out of ${total}`, false);
         
         if (!currentChannel && channels.length > 0) {
             const firstOnline = channels.find(ch => !offlineChannels.has(ch.url));
@@ -303,6 +344,7 @@
         showToast('Loading channels...');
         testingStatusDiv.innerHTML = '📥 Loading from Google Sheet...';
         offlineChannels.clear();
+        checkingChannels.clear();
         
         try {
             const response = await fetch(GOOGLE_SHEET_CSV_URL);
@@ -358,14 +400,18 @@
     }
     
     function populateCategoryDropdown() {
-        const onlineChannels = channels.filter(ch => !offlineChannels.has(ch.url));
+        const onlineChannels = channels.filter(ch => !offlineChannels.has(ch.url) && !checkingChannels.has(ch.url));
         const offlineCount = offlineChannels.size;
+        const checkingCount = checkingChannels.size;
         
         let html = `<option value="All">📺 All Active (${onlineChannels.length})</option>`;
         html += `<option value="Offline">📡 Offline (${offlineCount})</option>`;
+        if (checkingCount > 0) {
+            html += `<option value="Checking">🟠 Checking (${checkingCount})</option>`;
+        }
         
         for (let cat of categories) {
-            if (cat === 'All' || cat === 'Offline') continue;
+            if (cat === 'All' || cat === 'Offline' || cat === 'Checking') continue;
             const count = onlineChannels.filter(ch => ch.category === cat).length;
             if (count > 0) html += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)} (${count})</option>`;
         }
@@ -379,11 +425,15 @@
         filteredChannels = channels.filter(ch => {
             if (activeCategory === 'Offline') {
                 return offlineChannels.has(ch.url);
+            } else if (activeCategory === 'Checking') {
+                return checkingChannels.has(ch.url);
             } else if (activeCategory !== 'All') {
                 if (offlineChannels.has(ch.url)) return false;
+                if (checkingChannels.has(ch.url)) return false;
                 if (ch.category !== activeCategory) return false;
             } else {
                 if (offlineChannels.has(ch.url)) return false;
+                if (checkingChannels.has(ch.url)) return false;
             }
             if (searchTerm && !ch.name.toLowerCase().includes(searchTerm)) return false;
             return true;
@@ -395,6 +445,9 @@
     function getStatusIcon(channel) {
         if (offlineChannels.has(channel.url)) {
             return '<span class="status-icon status-offline" title="Offline">🔴</span>';
+        }
+        if (checkingChannels.has(channel.url)) {
+            return '<span class="status-icon status-checking" title="Checking...">🟠</span>';
         }
         return '<span class="status-icon status-online" title="Online">🟢</span>';
     }
@@ -409,6 +462,7 @@
         filteredChannels.forEach((ch, idx) => {
             const isActive = currentChannel && currentChannel.url === ch.url;
             const isOffline = offlineChannels.has(ch.url);
+            const isChecking = checkingChannels.has(ch.url);
             const isRadio = ch.category === 'Radio' || ch.name.toLowerCase().includes('radio');
             const statusIcon = getStatusIcon(ch);
             
@@ -431,10 +485,12 @@
             item.addEventListener('click', () => {
                 const idx = parseInt(item.dataset.index);
                 const channel = filteredChannels[idx];
-                if (channel && !offlineChannels.has(channel.url)) {
+                if (channel && !offlineChannels.has(channel.url) && !checkingChannels.has(channel.url)) {
                     selectChannel(channel);
                 } else if (channel && offlineChannels.has(channel.url)) {
                     showToast('This channel is offline', true);
+                } else if (channel && checkingChannels.has(channel.url)) {
+                    showToast('Still checking this channel...', true);
                 }
             });
         });
@@ -446,6 +502,10 @@
         if (!channel || !channel.url) return;
         if (offlineChannels.has(channel.url)) {
             showToast('Channel offline - cannot play', true);
+            return;
+        }
+        if (checkingChannels.has(channel.url)) {
+            showToast('Channel still being tested...', true);
             return;
         }
         currentChannel = channel;
@@ -467,11 +527,29 @@
             hls.loadSource(url);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, () => { showLoading(false); video.play().catch(() => {}); });
-            hls.on(Hls.Events.ERROR, () => { showLoading(false); showToast('Stream unavailable', true); });
+            hls.on(Hls.Events.ERROR, (event, data) => { 
+                showLoading(false); 
+                if (data.fatal) {
+                    showToast('Stream unavailable', true);
+                    // Mark as offline if playback fails
+                    offlineChannels.add(url);
+                    updateStatusBar();
+                    populateCategoryDropdown();
+                    applyFilters();
+                }
+            });
         } else {
             video.src = url;
             video.addEventListener('canplay', () => { showLoading(false); video.play().catch(() => {}); });
-            video.onerror = () => { showLoading(false); showToast('Cannot play', true); };
+            video.onerror = () => { 
+                showLoading(false); 
+                showToast('Cannot play this stream', true);
+                // Mark as offline if playback fails
+                offlineChannels.add(url);
+                updateStatusBar();
+                populateCategoryDropdown();
+                applyFilters();
+            };
         }
         setTimeout(() => { if (loadingOverlay.style.display !== 'none') showLoading(false); }, 15000);
     }
