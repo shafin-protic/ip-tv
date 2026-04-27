@@ -156,7 +156,7 @@
 </div>
 
 <script>
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTESN5TIXBEckCTwsoNEyMtecwRRkQoQwMI-09RPuz7kjwz-jPROLsNdfmRY0Q0aYFfeLgIQrFXbZK/pub?gid=1947259241&single=true&output=csv";
+    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTESN5TIXBEckCTwsoNEyMtecwRRkQoQwMI-09RPuz7kjwz-jPROLsNdfmRY0Q0aYFfeLgIQrFXbRZK/pub?gid=1947259241&single=true&output=csv";
     const GOOGLE_SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1lkZLaaxRjtJbwD_NhFQh6r7Hr_sxPnQGKiWKsu80cYI/edit?usp=sharing";
     
     let channels = [];
@@ -202,13 +202,7 @@
     }
     
     function showLoading(show) { loadingOverlay.style.display = show ? 'block' : 'none'; }
-    
-    function destroyHls() { 
-        if (hls) { 
-            hls.destroy(); 
-            hls = null; 
-        } 
-    }
+    function destroyHls() { if (hls) { hls.destroy(); hls = null; } }
     
     function updateStatusBar() {
         const online = channels.filter(ch => !offlineChannels.has(ch.url) && !checkingChannels.has(ch.url)).length;
@@ -241,7 +235,7 @@
         radioCategory.textContent = channel.category;
     }
     
-    // ========== FIXED STREAM TESTING ==========
+    // Improved stream testing - actually tries to load a small piece of the stream
     async function testStreamReal(url) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -251,23 +245,34 @@
             if (url.includes('.m3u8')) {
                 const response = await fetch(url, { 
                     signal: controller.signal,
-                    headers: { 
-                        'Accept': 'application/vnd.apple.mpegurl, */*',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        'Referer': 'http://202.70.146.135:8000/',
-                        'Origin': 'http://202.70.146.135:8000'
-                    },
-                    mode: 'cors'
+                    headers: { 'Accept': 'application/vnd.apple.mpegurl, */*' }
                 });
                 clearTimeout(timeoutId);
                 
                 if (response.ok) {
                     const text = await response.text();
+                    // Check if it's a valid m3u8 (contains #EXTM3U or #EXTINF)
                     if (text.includes('#EXTM3U') || text.includes('#EXTINF')) {
                         return true;
                     }
                 }
                 return false;
+            }
+            
+            // For other streams, try to get first few bytes
+            const response = await fetch(url, { 
+                signal: controller.signal,
+                headers: { 'Range': 'bytes=0-1024' }
+            });
+            clearTimeout(timeoutId);
+            
+            // Check if response is ok and has content
+            if (response.ok && response.status !== 404) {
+                const contentLength = response.headers.get('content-length');
+                if (contentLength && parseInt(contentLength) > 0) {
+                    return true;
+                }
+                return true; // Assume online if response ok
             }
             return false;
         } catch (error) {
@@ -284,11 +289,12 @@
         let tested = 0;
         let onlineCount = 0;
         
+        // Add all to checking set initially
         channelArray.forEach(ch => checkingChannels.add(ch.url));
         updateStatusBar();
         testingStatusDiv.innerHTML = `🔍 Testing 0/${total}`;
         
-        const batchSize = 2;
+        const batchSize = 3; // Smaller batch for more accurate testing
         for (let i = 0; i < channelArray.length; i += batchSize) {
             const batch = channelArray.slice(i, i + batchSize);
             const results = await Promise.all(batch.map(ch => testStreamReal(ch.url)));
@@ -310,7 +316,8 @@
             populateCategoryDropdown();
             applyFilters();
             
-            await new Promise(r => setTimeout(r, 150));
+            // Small delay between batches
+            await new Promise(r => setTimeout(r, 100));
         }
         
         testingStatusDiv.innerHTML = `✅ Complete: ${onlineCount} online, ${total - onlineCount} offline`;
@@ -333,128 +340,6 @@
         }
     }
     
-    // ========== FIXED PLAYBACK WITH HEADERS ==========
-    function playStream(url, channelName) {
-        showLoading(true);
-        destroyHls();
-        
-        const video = document.getElementById('videoPlayer');
-        
-        if (currentMode === 'radio') { 
-            video.style.display = 'none'; 
-            updateRadioDisplay(currentChannel); 
-        } else { 
-            video.style.display = 'block'; 
-        }
-        
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-        
-        const isHLS = url.includes('.m3u8');
-        
-        if (isHLS && Hls.isSupported()) {
-            // Configure HLS with proper headers for the stream
-            hls = new Hls({ 
-                enableWorker: true, 
-                lowLatencyMode: true, 
-                maxBufferLength: 30, 
-                manifestLoadingTimeOut: 10000,
-                fragLoadingTimeOut: 20000,
-                xhrSetup: function(xhr, url) {
-                    // Add custom headers for the specific IPTV server
-                    if (url.includes('202.70.146.135')) {
-                        xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-                        xhr.setRequestHeader('Referer', 'http://202.70.146.135:8000/');
-                        xhr.setRequestHeader('Origin', 'http://202.70.146.135:8000');
-                    }
-                    // Also try without CORS restrictions for other servers
-                    xhr.withCredentials = false;
-                }
-            });
-            
-            hls.loadSource(url);
-            hls.attachMedia(video);
-            
-            hls.on(Hls.Events.MANIFEST_PARSED, () => { 
-                showLoading(false); 
-                video.play().catch(e => console.log('Play error:', e));
-            });
-            
-            hls.on(Hls.Events.ERROR, (event, data) => { 
-                console.log('HLS Error:', data);
-                showLoading(false); 
-                if (data.fatal) {
-                    // If fails with headers, try without them
-                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                        showToast('Retrying without headers...', false);
-                        retryPlayWithoutHeaders(url);
-                    } else {
-                        showToast('Stream unavailable', true);
-                        offlineChannels.add(url);
-                        updateStatusBar();
-                        populateCategoryDropdown();
-                        applyFilters();
-                    }
-                }
-            });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Native HLS support (Safari)
-            video.src = url;
-            video.addEventListener('canplay', () => { 
-                showLoading(false); 
-                video.play().catch(() => {});
-            });
-            video.onerror = () => { 
-                showLoading(false); 
-                showToast('Cannot play this stream', true);
-                offlineChannels.add(url);
-                updateStatusBar();
-                populateCategoryDropdown();
-                applyFilters();
-            };
-        } else {
-            showLoading(false);
-            showToast('HLS not supported in this browser', true);
-        }
-        
-        // Safety timeout
-        setTimeout(() => { 
-            if (loadingOverlay.style.display !== 'none') {
-                showLoading(false);
-                showToast('Stream loading timeout', true);
-            }
-        }, 15000);
-    }
-    
-    // Fallback: try playing without custom headers
-    function retryPlayWithoutHeaders(url) {
-        destroyHls();
-        const video = document.getElementById('videoPlayer');
-        
-        const fallbackHls = new Hls({ 
-            enableWorker: true, 
-            lowLatencyMode: true,
-            maxBufferLength: 30
-        });
-        
-        fallbackHls.loadSource(url);
-        fallbackHls.attachMedia(video);
-        
-        fallbackHls.on(Hls.Events.MANIFEST_PARSED, () => {
-            showLoading(false);
-            video.play().catch(() => {});
-        });
-        
-        fallbackHls.on(Hls.Events.ERROR, () => {
-            showLoading(false);
-            showToast('Stream failed to load', true);
-        });
-        
-        hls = fallbackHls;
-    }
-    
-    // ========== REST OF YOUR ORIGINAL CODE (unchanged) ==========
     async function loadFromGoogleSheet() {
         showToast('Loading channels...');
         testingStatusDiv.innerHTML = '📥 Loading from Google Sheet...';
@@ -629,10 +514,47 @@
         playStream(channel.url, channel.name);
     }
     
-    function initVideo() { 
-        videoPlayer = document.getElementById('videoPlayer'); 
-        if (videoPlayer) videoPlayer.volume = volumeSlider.value / 100; 
+    function playStream(url, channelName) {
+        showLoading(true);
+        destroyHls();
+        const video = document.getElementById('videoPlayer');
+        if (currentMode === 'radio') { video.style.display = 'none'; updateRadioDisplay(currentChannel); } 
+        else { video.style.display = 'block'; }
+        video.pause(); video.removeAttribute('src'); video.load();
+        const isHLS = url.includes('.m3u8');
+        if (isHLS && Hls.isSupported()) {
+            hls = new Hls({ enableWorker: true, lowLatencyMode: true, maxBufferLength: 30, manifestLoadingTimeOut: 10000 });
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => { showLoading(false); video.play().catch(() => {}); });
+            hls.on(Hls.Events.ERROR, (event, data) => { 
+                showLoading(false); 
+                if (data.fatal) {
+                    showToast('Stream unavailable', true);
+                    // Mark as offline if playback fails
+                    offlineChannels.add(url);
+                    updateStatusBar();
+                    populateCategoryDropdown();
+                    applyFilters();
+                }
+            });
+        } else {
+            video.src = url;
+            video.addEventListener('canplay', () => { showLoading(false); video.play().catch(() => {}); });
+            video.onerror = () => { 
+                showLoading(false); 
+                showToast('Cannot play this stream', true);
+                // Mark as offline if playback fails
+                offlineChannels.add(url);
+                updateStatusBar();
+                populateCategoryDropdown();
+                applyFilters();
+            };
+        }
+        setTimeout(() => { if (loadingOverlay.style.display !== 'none') showLoading(false); }, 15000);
     }
+    
+    function initVideo() { videoPlayer = document.getElementById('videoPlayer'); videoPlayer.volume = volumeSlider.value / 100; }
     
     // Event listeners
     editSheetBtn.addEventListener('click', () => {
@@ -649,7 +571,7 @@
         else if (channels.length > 0) { 
             const firstOnline = channels.find(ch => !offlineChannels.has(ch.url)); 
             if (firstOnline) selectChannel(firstOnline); 
-        } else showToast('Load channels first', true); 
+        } else showToast('Load first', true); 
     });
     
     pauseBtn.addEventListener('click', () => { if (videoPlayer) videoPlayer.pause(); });
